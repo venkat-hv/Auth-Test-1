@@ -22,36 +22,86 @@ app.use(
   })
 );
 
+// async function auth1(req, res, next) {
+//   try {
+//     const token = req.cookies["auth_token"];
+//     console.log('token: ', token)
+//     let user;
+//     if (!token) {
+//       console.log('Redirecting to Auth')
+//       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
+//       return res.redirect(redirect);
+//     } else {
+//       try {
+//         console.log('Fetching user data')
+//         const response = await axios.get(`${AUTH_SERVER}/me`, {
+//           headers: {
+//             Cookie: `auth_token=${token}`,
+//           },
+//         });
+//         user = response.data.user;
+//       } catch (error) {
+//         console.log("Token Expired. Redirecting to Auth Server");
+//         const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
+//         return res.redirect(redirect);
+//       }
+//     }
+
+//     req.user = user;
+//     next();
+//   } catch (error) {
+//     console.log("ERROR in auth1: ", error);
+//     return res.status(500).json({ message: error.message });
+//   }
+// }
+
 async function auth1(req, res, next) {
   try {
-    const token = req.cookies["auth_token"];
-    console.log('token: ', token)
-    let user;
+    const cookieToken = req.cookies["auth_token"];
+    const queryToken = req.query.token;
+    let token;
+
+    // Step 1: If token is not in cookies, check the query param
+    if (!cookieToken && queryToken) {
+      token = queryToken;
+
+      // Step 2: Store the token in a cookie scoped to the client app
+      res.cookie("auth_token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "Lax", // or 'None' if cross-site requests needed
+        maxAge: 3600000,
+      });
+
+      // Step 3: Redirect to clean up URL (remove ?token=...)
+      return next()
+    }
+
+    // Step 4: Proceed with local JWT verification
     if (!token) {
-      console.log('Redirecting to Auth')
+      return res.redirect("/");
+    }
+
+    let user
+    try {
+      console.log("Fetching user data");
+      const response = await axios.get(`${AUTH_SERVER}/me`, {
+        headers: {
+          Cookie: `auth_token=${token}`,
+        },
+      });
+      user = response.data.user;
+    } catch (error) {
+      console.log("Token Expired. Redirecting to Auth Server");
       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
       return res.redirect(redirect);
-    } else {
-      try {
-        console.log('Fetching user data')
-        const response = await axios.get(`${AUTH_SERVER}/me`, {
-          headers: {
-            Cookie: `auth_token=${token}`,
-          },
-        });
-        user = response.data.user;
-      } catch (error) {
-        console.log("Token Expired. Redirecting to Auth Server");
-        const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
-        return res.redirect(redirect);
-      }
     }
 
     req.user = user;
     next();
-  } catch (error) {
-    console.log("ERROR in auth1: ", error);
-    return res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error(err);
+    return res.redirect("/");
   }
 }
 
