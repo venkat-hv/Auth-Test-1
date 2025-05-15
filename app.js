@@ -25,12 +25,15 @@ app.use(
 async function auth1(req, res, next) {
   try {
     const token = req.cookies["auth_token"];
+    console.log('token: ', token)
     let user;
     if (!token) {
+      console.log('Redirecting to Auth')
       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
       return res.redirect(redirect);
     } else {
       try {
+        console.log('Fetching user data')
         const response = await axios.get(`${AUTH_SERVER}/me`, {
           headers: {
             Cookie: `auth_token=${token}`,
