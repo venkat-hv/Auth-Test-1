@@ -57,51 +57,37 @@ app.use(
 
 async function auth1(req, res, next) {
   try {
-    const cookieToken = req.cookies["auth_token"];
     const queryToken = req.query.token;
-    let token;
+    const cookieToken = req.cookies["auth_token"];
+    let token, user;
 
-    // Step 1: If token is not in cookies, check the query param
-    if (!cookieToken && queryToken) {
-      token = queryToken;
-
-      // Step 2: Store the token in a cookie scoped to the client app
-      res.cookie("auth_token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "Lax", // or 'None' if cross-site requests needed
-        maxAge: 3600000,
-      });
-
-      // Step 3: Redirect to clean up URL (remove ?token=...)
-      return next()
-    }
-
-    // Step 4: Proceed with local JWT verification
-    if (!token) {
-      return res.redirect("/");
-    }
-
-    let user
-    try {
-      console.log("Fetching user data");
-      const response = await axios.get(`${AUTH_SERVER}/me`, {
-        headers: {
-          Cookie: `auth_token=${token}`,
-        },
-      });
-      user = response.data.user;
-    } catch (error) {
-      console.log("Token Expired. Redirecting to Auth Server");
+    if (!queryToken && !cookieToken) {
+      console.log("Redirecting to Auth");
       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
       return res.redirect(redirect);
+    } else if (queryToken && !cookieToken) {
+      token = queryToken;
+      console.log("Fetching user data");
+      try {
+        const response = await axios.get(`${AUTH_SERVER}/me`, {
+          headers: {
+            Cookie: `auth_token=${token}`,
+          },
+        });
+
+        user = response.data.user;
+      } catch (error) {
+        console.log("Token Expired. Redirecting to Auth");
+        const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
+        return res.redirect(redirect);
+      }
     }
 
     req.user = user;
     next();
-  } catch (err) {
-    console.error(err);
-    return res.redirect("/");
+  } catch (error) {
+    console.log("ERROR in auth1: ", error);
+    return res.status(500).json({ message: error.message });
   }
 }
 
