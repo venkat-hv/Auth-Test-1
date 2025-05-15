@@ -3,13 +3,14 @@ const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-require("dotenv").config({ path: ".env.production" });
+require("dotenv").config({ path: ".env.staging" });
 
 const app = express();
 const PORT = 4000;
 
 const AUTH_SERVER = process.env.AUTH_SERVER;
 const HOST = process.env.HOST;
+JWT_SECRET = process.env.JWT_SECRET;
 
 // Middleware (SESSION, COOKIES)
 app.use(cookieParser());
@@ -21,18 +22,20 @@ app.use(
   })
 );
 
-
 async function auth1(req, res, next) {
   try {
     const token = req.cookies["auth_token"];
-
     let user;
     if (!token) {
       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
       return res.redirect(redirect);
     } else {
       try {
-        const response = await axios.get(`${AUTH_SERVER}/me`);
+        const response = await axios.get(`${AUTH_SERVER}/me`, {
+          headers: {
+            Cookie: `auth_token=${token}`,
+          },
+        });
         user = response.data.user;
       } catch (error) {
         console.log(
@@ -60,7 +63,13 @@ async function auth2(req, res, next) {
       const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
       return res.redirect(redirect);
     } else {
-      user = jwt.verify(token, JWT_SECRET); // Needs shared secret
+      try {
+        user = jwt.verify(token, JWT_SECRET); // Needs shared secret
+      } catch (error) {
+        console.log("Token Expired. Redirecting to Auth Server");
+        const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
+        return res.redirect(redirect);
+      }
     }
 
     req.user = user;
@@ -81,7 +90,7 @@ app.get("/dashboard", auth1, async (req, res) => {
   try {
     const user = req.user;
     res.send(
-      `<h2>Welcome, ${user.name}</h2><p>Email: ${user.email}</p><br/><p>Email: ${user.role}</p><a href="/logout">Logout</a>`
+      `<h2>Welcome, ${user.name}</h2><p>Email: ${user.email}</p><br/><p>Email: ${user.role}</p><a href="/auth/logout">Logout</a>`
     );
   } catch (err) {
     console.error(err);
