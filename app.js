@@ -38,11 +38,9 @@ async function auth1(req, res, next) {
         });
         user = response.data.user;
       } catch (error) {
-        console.log(
-          `ERROR in authentication with response (${error.response.status}): `,
-          error.response.data
-        );
-        return res.status(400).json({ message: "Unauthorized" });
+        console.log("Token Expired. Redirecting to Auth Server");
+        const redirect = `${AUTH_SERVER}/auth/google?redirect=${HOST}/dashboard`;
+        return res.redirect(redirect);
       }
     }
 
@@ -90,7 +88,7 @@ app.get("/dashboard", auth1, async (req, res) => {
   try {
     const user = req.user;
     res.send(
-      `<h2>Welcome, ${user.name}</h2><p>Email: ${user.email}</p><br/><p>Email: ${user.role}</p><a href="/auth/logout">Logout</a>`
+      `<h2>Welcome, ${user.name}</h2><p>Email: ${user.email}</p><br/><p>Email: ${user.role}</p><a href="/logout">Logout</a>`
     );
   } catch (err) {
     console.error(err);
@@ -101,7 +99,7 @@ app.get("/dashboard", auth1, async (req, res) => {
 app.get("/logout", (req, res) => {
   res.clearCookie("auth_token");
 
-  return res.redirect(`${AUTH_SERVER}/logout?redirect=${HOST}/`);
+  return res.redirect(`${AUTH_SERVER}/auth/logout?redirect=${HOST}/`);
 });
 
 app.listen(PORT, () => console.log("Client running on port: ", PORT));
